@@ -3,258 +3,111 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>簡単アンケート</title>
+    <title>簡単アンケート（Q1とQ2のみ）</title>
     <style>
-      :root {
-        --bg: #0b0c10;
-        --panel: #111218;
-        --text: #e6e6e6;
-        --muted: #a7a7a7;
-        --primary: #4f8cff;
-        --accent: #79ffa8;
-        --danger: #ff6b6b;
-        --border: #23242c;
-      }
-
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif;
-        background: radial-gradient(1200px 600px at 75% -10%, #1a1b25 0%, #0b0c10 60%);
-        color: var(--text);
-        line-height: 1.6;
-      }
-
-      .container {
-        max-width: 780px;
-        margin: 48px auto;
-        padding: 24px;
-      }
-
-      .panel {
-        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 28px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05);
-        backdrop-filter: blur(6px);
-      }
-
-      h1 {
-        margin: 0 0 6px;
-        font-size: 28px;
-        letter-spacing: .02em;
-      }
-      .sub {
-        margin: 0 0 18px;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      form { margin-top: 8px; }
-      .q { padding: 18px 0; border-top: 1px solid var(--border); }
+      /* 必要最低限のスタイルだけ（シンプル） */
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif; margin: 24px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 22px; }
+      form { margin-top: 12px; max-width: 600px; }
+      .q { padding: 14px 0; border-top: 1px solid #e5e5e5; }
       .q:first-of-type { border-top: none; padding-top: 0; }
-      .q-title { display: block; font-weight: 600; margin-bottom: 10px; }
-      .req { color: var(--primary); font-weight: 600; font-size: 12px; margin-left: 8px; padding: 2px 6px; border: 1px solid var(--primary); border-radius: 999px; }
-      .hint { color: var(--muted); font-size: 12px; margin-top: 6px; display: inline-block; }
-
-      .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
-      .choices label { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: #12131a; cursor: pointer; }
-      .choices input[type="radio"], .choices input[type="checkbox"] { accent-color: var(--primary); }
-
-      select, input[type="text"], input[type="email"], textarea {
-        width: 100%;
-        padding: 12px 14px;
-        border-radius: 12px;
-        background: #12131a;
-        border: 1px solid var(--border);
-        color: var(--text);
-        outline: none;
-        transition: border-color .15s ease, box-shadow .15s ease;
-      }
-      select:focus, input:focus, textarea:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.2);
-      }
-
-      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
-
-      .counter { color: var(--muted); font-size: 12px; text-align: right; margin-top: 6px; }
-
-      .actions { margin-top: 18px; display: flex; gap: 10px; }
-      button {
-        appearance: none;
-        border: none;
-        padding: 12px 18px;
-        border-radius: 12px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      .primary { background: var(--primary); color: #0b0c10; }
-      .secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
-      button[disabled] { opacity: .6; cursor: not-allowed; }
-
-      /* Star rating */
+      .q-title { display: block; font-weight: 600; margin-bottom: 8px; }
+      .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
+      .choices label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e5e5e5; border-radius: 10px; cursor: pointer; }
       .rating { display: inline-flex; gap: 6px; direction: rtl; }
       .rating input { position: absolute; left: -9999px; }
-      .rating label {
-        font-size: 26px;
-        color: #3a3b46;
-        cursor: pointer;
-        filter: drop-shadow(0 1px 0 rgba(0,0,0,.4));
-        transition: transform .1s ease, color .1s ease;
-      }
-      .rating label:hover, .rating label:focus { transform: scale(1.05); }
-      .rating input:checked ~ label, .rating label:hover, .rating label:hover ~ label { color: #ffd166; }
-
-      /* Result panel */
-      #result { display: none; }
-      .kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px; }
-      .kv b { color: var(--muted); font-weight: 600; }
-      .kv div { border-bottom: 1px dashed #2a2b34; padding-bottom: 6px; }
+      .rating label { font-size: 26px; color: #ccc; cursor: pointer; }
+      .rating input:checked ~ label, .rating label:hover, .rating label:hover ~ label { color: #f5b301; }
+      button { padding: 10px 16px; border-radius: 10px; border: 1px solid #e5e5e5; background: #111; color: #fff; cursor: pointer; }
+      small { color: #666; }
     </style>
   </head>
   <body>
-    <main class="container">
-      <div class="panel">
-        <h1>簡単アンケート</h1>
-        <p class="sub">所要時間: 約1分。ご協力ありがとうございます！</p>
+    <h1>簡単アンケート</h1>
+    <form id="survey" novalidate>
+      <!-- Q1: どこで知ったか（必須） -->
+      <section class="q">
+        <label class="q-title">Q1. このサービスをどこで知りましたか？（必須）</label>
+        <div class="choices">
+          <label><input type="radio" name="discover" value="SNS" required /> SNS</label>
+          <label><input type="radio" name="discover" value="検索" /> 検索</label>
+          <label><input type="radio" name="discover" value="友人・同僚" /> 友人・同僚</label>
+          <label><input type="radio" name="discover" value="イベント" /> イベント</label>
+          <label><input type="radio" name="discover" value="その他" /> その他</label>
+        </div>
+      </section>
 
-        <form id="survey" novalidate>
-          <section class="q">
-            <label class="q-title">Q1. このサービスをどこで知りましたか？ <span class="req">必須</span></label>
-            <div class="choices">
-              <label><input type="radio" name="discover" value="SNS" required /> SNS</label>
-              <label><input type="radio" name="discover" value="検索" /> 検索</label>
-              <label><input type="radio" name="discover" value="友人・同僚" /> 友人・同僚</label>
-              <label><input type="radio" name="discover" value="イベント" /> イベント</label>
-              <label><input type="radio" name="discover" value="その他" /> その他</label>
-            </div>
-          </section>
+      <!-- Q2: Q1の内容に応じて質問文が変わる（必須） -->
+      <section class="q" id="q2">
+        <label class="q-title">Q2. <span id="q2TitleText">満足度を教えてください</span>（必須）</label>
+        <div class="rating" role="radiogroup" aria-label="満足度">
+          <input type="radio" id="star5" name="satisfaction" value="5" required />
+          <label for="star5" title="とても満足">★</label>
+          <input type="radio" id="star4" name="satisfaction" value="4" />
+          <label for="star4" title="満足">★</label>
+          <input type="radio" id="star3" name="satisfaction" value="3" />
+          <label for="star3" title="普通">★</label>
+          <input type="radio" id="star2" name="satisfaction" value="2" />
+          <label for="star2" title="やや不満">★</label>
+          <input type="radio" id="star1" name="satisfaction" value="1" />
+          <label for="star1" title="不満">★</label>
+        </div>
+        <small id="q2Hint">★の数で評価してください</small>
+      </section>
 
-          <section class="q">
-            <label class="q-title">Q2. 満足度を教えてください <span class="req">必須</span></label>
-            <div class="rating" role="radiogroup" aria-label="満足度">
-              <input type="radio" id="star5" name="satisfaction" value="5" required />
-              <label for="star5" title="とても満足">★</label>
-              <input type="radio" id="star4" name="satisfaction" value="4" />
-              <label for="star4" title="満足">★</label>
-              <input type="radio" id="star3" name="satisfaction" value="3" />
-              <label for="star3" title="普通">★</label>
-              <input type="radio" id="star2" name="satisfaction" value="2" />
-              <label for="star2" title="やや不満">★</label>
-              <input type="radio" id="star1" name="satisfaction" value="1" />
-              <label for="star1" title="不満">★</label>
-            </div>
-            <div class="hint">★の数を選択してください</div>
-          </section>
-
-          <section class="q">
-            <label class="q-title" for="usage">Q3. 利用頻度を選んでください <span class="req">必須</span></label>
-            <select id="usage" name="usage" required>
-              <option value="" disabled selected>選択してください</option>
-              <option>毎日</option>
-              <option>週に数回</option>
-              <option>月に数回</option>
-              <option>今回が初めて</option>
-            </select>
-          </section>
-
-          <section class="q">
-            <div class="row">
-              <div>
-                <label class="q-title" for="name">お名前（任意）</label>
-                <input id="name" name="name" type="text" placeholder="例: 山田太郎" autocomplete="name" />
-              </div>
-              <div>
-                <label class="q-title" for="email">メール（任意）</label>
-                <input id="email" name="email" type="email" placeholder="例: example@mail.com" autocomplete="email" />
-              </div>
-            </div>
-          </section>
-
-          <section class="q">
-            <label class="q-title" for="feedback">ご意見・ご感想（任意）</label>
-            <textarea id="feedback" name="feedback" rows="4" maxlength="500" placeholder="良かった点・改善点などがあればご記入ください"></textarea>
-            <div class="counter" id="counter">0 / 500</div>
-          </section>
-
-          <div class="actions">
-            <button class="secondary" type="reset">リセット</button>
-            <button class="primary" id="submitBtn" type="submit">送信する</button>
-          </div>
-        </form>
-
-        <section id="result" class="q">
-          <h2 style="margin:0 0 8px; font-size:22px;">送信ありがとうございました！</h2>
-          <p class="sub" style="margin-bottom:14px;">以下の内容で受け付けました。</p>
-          <div class="kv" id="summary"></div>
-          <div class="actions" style="margin-top:20px;">
-            <button class="secondary" id="backBtn" type="button">修正する</button>
-          </div>
-        </section>
+      <div class="q">
+        <button type="submit">送信する</button>
       </div>
-    </main>
+    </form>
 
     <script>
+      // ——— できるだけシンプルな連動ロジック ———
+      // 1) HTML要素を取得
       const form = document.getElementById('survey');
-      const result = document.getElementById('result');
-      const summary = document.getElementById('summary');
-      const backBtn = document.getElementById('backBtn');
-      const counter = document.getElementById('counter');
-      const feedbackEl = document.getElementById('feedback');
+      const q1Radios = document.querySelectorAll('input[name="discover"]');
+      const q2TitleText = document.getElementById('q2TitleText');
+      const q2Hint = document.getElementById('q2Hint');
+      const q2Radios = document.querySelectorAll('input[name="satisfaction"]');
+      const q2Group = document.querySelector('.rating');
 
-      // Live counter for feedback
-      feedbackEl.addEventListener('input', () => {
-        counter.textContent = `${feedbackEl.value.length} / ${feedbackEl.maxLength}`;
-      });
+      // 2) Q1の値に応じて表示したいQ2の文言（表）
+      const q2TextMap = {
+        'SNS': 'SNSで見た情報は役に立ちましたか？',
+        '検索': '検索結果の内容は分かりやすかったですか？',
+        '友人・同僚': '紹介への満足度を教えてください',
+        'イベント': 'イベントの内容に満足しましたか？',
+        'その他': '全体的な満足度を教えてください',
+        'default': '満足度を教えてください',
+      };
 
-      // Submit handler
+      // 3) Q1が変わったらQ2の文言を更新
+      function updateQ2ByQ1() {
+        const selected = document.querySelector('input[name="discover"]:checked');
+        const key = selected ? selected.value : 'default';
+        q2TitleText.textContent = q2TextMap[key] || q2TextMap.default;
+        q2Group.setAttribute('aria-label', q2TitleText.textContent);
+        q2Hint.textContent = '★の数で評価してください';
+        // Q1が変わったらQ2は選び直しにする
+        q2Radios.forEach(r => r.checked = false);
+      }
+
+      q1Radios.forEach(r => r.addEventListener('change', updateQ2ByQ1));
+      updateQ2ByQ1(); // 初期反映
+
+      // 4) 送信ボタン（最小限）。バリデーションはブラウザに任せる。
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-
-        // Basic validation feedback
         if (!form.checkValidity()) {
           form.reportValidity();
           return;
         }
-
-        const data = new FormData(form);
-        const entries = Object.fromEntries(data.entries());
-
-        // Build summary view
-        const rows = [
-          ['知ったきっかけ', entries.discover || '-'],
-          ['満足度', entries.satisfaction ? `${entries.satisfaction} / 5` : '-'],
-          ['利用頻度', entries.usage || '-'],
-          ['お名前', entries.name || '-'],
-          ['メール', entries.email || '-'],
-          ['ご意見', entries.feedback?.trim() || '-'],
-        ];
-
-        summary.innerHTML = rows.map(([k, v]) => (
-          `<b>${k}</b><div>${escapeHtml(v)}</div>`
-        )).join('');
-
-        form.style.display = 'none';
-        result.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const discover = document.querySelector('input[name="discover"]:checked')?.value;
+        const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value;
+        alert(`送信ありがとうございました\nQ1: ${discover}\nQ2: ${satisfaction} / 5`);
+        form.reset();
+        updateQ2ByQ1();
       });
-
-      backBtn.addEventListener('click', () => {
-        result.style.display = 'none';
-        form.style.display = '';
-      });
-
-      function escapeHtml(str) {
-        return String(str)
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;')
-          .replaceAll('"', '&quot;')
-          .replaceAll("'", '&#039;');
-      }
     </script>
   </body>
 </html>
+
