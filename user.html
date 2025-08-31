@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ユーザー画面 | アンケート</title>
+    <style>
+      :root { --accent: #4f8cff; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif; margin: 24px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 22px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+      .list { display: grid; gap: 10px; }
+      .item { border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px; }
+      .muted { color: #666; }
+      a.btn { display: inline-block; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--accent); color: #333; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <h1>ユーザー画面</h1>
+    <p class="muted">回答可能なアンケート案件が表示されます。</p>
+    <div id="list" class="list"></div>
+    <p style="margin-top:14px;"><a class="btn" href="top.html">トップへ戻る</a></p>
+    <script>
+      const PROJECTS_KEY = 'surveyProjectsV1';
+      const CONFIG_KEY = (id) => `surveyConfigV1:${id}`;
+      function loadProjects(){ try{ return JSON.parse(localStorage.getItem(PROJECTS_KEY)||'[]'); }catch{ return []; } }
+      function withinRange(p){ const now=new Date(); if(p.start && new Date(p.start)>now) return false; if(p.end && new Date(p.end)<now) return false; return true; }
+      function loadConfig(id){ try{ const raw=localStorage.getItem(CONFIG_KEY(id)); return raw?JSON.parse(raw):null; }catch{return null;} }
+      const list = document.getElementById('list');
+      const items = loadProjects().filter(p=>p.status==='active' && withinRange(p));
+      if (!items.length) { list.innerHTML = '<div class="muted">現在、回答可能な案件はありません。</div>'; }
+      items.forEach(p=>{
+        const cfg = loadConfig(p.surveyId);
+        const div = document.createElement('div'); div.className='item';
+        div.innerHTML = `<b>${p.name}</b><div class="muted">期間: ${(p.start||'-')} 〜 ${(p.end||'-')}</div><div style="margin-top:8px;"><a class="btn" href="index.html?project=${p.id}">回答する</a></div>`;
+        list.appendChild(div);
+      });
+    </script>
+  </body>
+  </html>
+
