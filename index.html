@@ -14,16 +14,32 @@
       .q-title { display: block; font-weight: 600; margin-bottom: 8px; }
       .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
       .choices label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e5e5e5; border-radius: 10px; cursor: pointer; }
-      .rating { display: inline-flex; gap: 6px; direction: rtl; }
-      .rating input { position: absolute; left: -9999px; }
-      .rating label { font-size: 26px; color: #ccc; cursor: pointer; }
-      .rating input:checked ~ label, .rating label:hover, .rating label:hover ~ label { color: #f5b301; }
+      .rating { display: inline-flex; gap: 6px; }
+      .rating input { margin-right: 2px; }
       button { padding: 10px 16px; border-radius: 10px; border: 1px solid #e5e5e5; background: #111; color: #fff; cursor: pointer; }
       small { color: #666; }
+      table.matrix { border-collapse: collapse; }
+      table.matrix th, table.matrix td { border: 1px solid #e5e5e5; padding: 6px 8px; text-align: center; }
+      table.matrix th { background: #fafafa; }
+      input[type="text"], textarea { width: 100%; padding: 8px 10px; border: 1px solid #e5e5e5; border-radius: 8px; }
     </style>
   </head>
   <body>
     <h1>簡単アンケート</h1>
+    <div style="margin: 8px 0 16px;">
+      <button id="adminToggle" type="button">管理モード</button>
+    </div>
+    <section id="adminPanel" style="display:none; border:1px solid #e5e5e5; padding:12px; border-radius:10px; margin-bottom:16px;">
+      <p style="margin:0 0 8px;">
+        Q1の選択肢とQ2の文言をJSONで編集できます。<br/>
+        例: {"options":["SNS","検索"], "q2TextMap":{"SNS":"…","default":"…"}, "q2Hint":"…"}
+      </p>
+      <textarea id="configEditor" rows="12" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border:1px solid #e5e5e5; border-radius:8px; padding:8px;"></textarea>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="saveConfigBtn" type="button">保存</button>
+        <button id="resetConfigBtn" type="button">既定に戻す</button>
+      </div>
+    </section>
     <form id="survey" novalidate>
       <!-- Q1: どこで知ったか（必須） -->
       <section class="q">
@@ -37,22 +53,11 @@
         </div>
       </section>
 
-      <!-- Q2: Q1の内容に応じて質問文が変わる（必須） -->
+      <!-- Q2: Q1の内容に応じて質問文/形式が変わる（必須） -->
       <section class="q" id="q2">
         <label class="q-title">Q2. <span id="q2TitleText">満足度を教えてください</span>（必須）</label>
-        <div class="rating" role="radiogroup" aria-label="満足度">
-          <input type="radio" id="star5" name="satisfaction" value="5" required />
-          <label for="star5" title="とても満足">★</label>
-          <input type="radio" id="star4" name="satisfaction" value="4" />
-          <label for="star4" title="満足">★</label>
-          <input type="radio" id="star3" name="satisfaction" value="3" />
-          <label for="star3" title="普通">★</label>
-          <input type="radio" id="star2" name="satisfaction" value="2" />
-          <label for="star2" title="やや不満">★</label>
-          <input type="radio" id="star1" name="satisfaction" value="1" />
-          <label for="star1" title="不満">★</label>
-        </div>
-        <small id="q2Hint">★の数で評価してください</small>
+        <div id="q2Body"></div>
+        <small id="q2Hint">1〜5で評価してください</small>
       </section>
 
       <div class="q">
@@ -64,35 +69,262 @@
       // ——— できるだけシンプルな連動ロジック ———
       // 1) HTML要素を取得
       const form = document.getElementById('survey');
-      const q1Radios = document.querySelectorAll('input[name="discover"]');
+      let q1Radios = document.querySelectorAll('input[name="discover"]');
       const q2TitleText = document.getElementById('q2TitleText');
       const q2Hint = document.getElementById('q2Hint');
-      const q2Radios = document.querySelectorAll('input[name="satisfaction"]');
-      const q2Group = document.querySelector('.rating');
+      const q2Body = document.getElementById('q2Body');
+      const choicesEl = document.querySelector('.choices');
 
-      // 2) Q1の値に応じて表示したいQ2の文言（表）
-      const q2TextMap = {
-        'SNS': 'SNSで見た情報は役に立ちましたか？',
-        '検索': '検索結果の内容は分かりやすかったですか？',
-        '友人・同僚': '紹介への満足度を教えてください',
-        'イベント': 'イベントの内容に満足しましたか？',
-        'その他': '全体的な満足度を教えてください',
-        'default': '満足度を教えてください',
+      // 管理UI
+      const adminToggle = document.getElementById('adminToggle');
+      const adminPanel = document.getElementById('adminPanel');
+      const configEditor = document.getElementById('configEditor');
+      const saveConfigBtn = document.getElementById('saveConfigBtn');
+      const resetConfigBtn = document.getElementById('resetConfigBtn');
+
+      // 既定設定
+      const defaultConfig = {
+        options: ['SNS', '検索', '友人・同僚', 'イベント', 'その他'],
+        q2: {
+          type: 'likert',
+          titleMap: {
+            'SNS': 'SNSで見た情報は役に立ちましたか？',
+            '検索': '検索結果の内容は分かりやすかったですか？',
+            '友人・同僚': '紹介への満足度を教えてください',
+            'イベント': 'イベントの内容に満足しましたか？',
+            'その他': '全体的な満足度を教えてください',
+            'default': '満足度を教えてください',
+          },
+          hint: '1〜5で評価してください',
+          // 各形式の設定（必要に応じて使用）
+          likert: { points: 5, minLabel: '低い', maxLabel: '高い' },
+          single: { options: ['はい', 'いいえ'] },
+          multiple: { options: ['A', 'B', 'C'] },
+          matrix: { rows: ['使いやすさ', 'デザイン'], cols: ['不満', '普通', '満足'] },
+          short: { placeholder: '短文で入力', preset: '', pattern: '', maxlength: 100 },
+          long: { placeholder: 'ご自由に入力', preset: '', pattern: '', maxlength: 500, rows: 5 },
+        },
       };
 
-      // 3) Q1が変わったらQ2の文言を更新
+      // 設定ロード
+      function loadConfig() {
+        try {
+          const raw = localStorage.getItem('surveyConfigV1');
+          if (!raw) return JSON.parse(JSON.stringify(defaultConfig));
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed.options)) throw new Error('optionsが配列ではありません');
+          if (parsed.options.length > 100) throw new Error('Q1の選択肢は最大100個です');
+          if (typeof parsed.q2 !== 'object') throw new Error('q2設定が不正です');
+          return parsed;
+        } catch (e) {
+          alert('設定の読み込みに失敗したため既定値を使用します: ' + e.message);
+          return JSON.parse(JSON.stringify(defaultConfig));
+        }
+      }
+
+      let currentConfig = loadConfig();
+
+      // 設定の適用（Q1再構築、イベント再付与、ヒント反映、Q2更新）
+      function applyConfig(cfg) {
+        choicesEl.innerHTML = cfg.options.map((label, idx) => {
+          const safe = escapeHtml(label);
+          const required = idx === 0 ? 'required' : '';
+          return `<label><input type="radio" name="discover" value="${safe}" ${required} /> ${safe}</label>`;
+        }).join('');
+
+        q1Radios = document.querySelectorAll('input[name="discover"]');
+        q1Radios.forEach(r => r.addEventListener('change', updateQ2ByQ1));
+
+        updateQ2ByQ1();
+      }
+
+      function refreshEditor(cfg) {
+        configEditor.value = JSON.stringify(cfg, null, 2);
+      }
+
+      adminToggle.addEventListener('click', () => {
+        adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
+        if (adminPanel.style.display === 'block') refreshEditor(currentConfig);
+      });
+
+      saveConfigBtn.addEventListener('click', () => {
+        try {
+          const next = JSON.parse(configEditor.value);
+          if (!Array.isArray(next.options)) throw new Error('options は配列で指定してください');
+          if (next.options.length > 100) throw new Error('Q1の選択肢は最大100個まで');
+          if (typeof next.q2 !== 'object') throw new Error('q2 はオブジェクトで指定してください');
+          // 形式別の軽いバリデーション
+          const t = next.q2.type;
+          if (!['likert','single','multiple','matrix','short','long'].includes(t)) throw new Error('q2.type が不正です');
+          if (t === 'likert') {
+            const p = Number(next.q2.likert?.points ?? 5);
+            if (!(p >= 2 && p <= 10)) throw new Error('likert.points は2〜10');
+          }
+          if (t === 'single' && (!Array.isArray(next.q2.single?.options) || next.q2.single.options.length === 0 || next.q2.single.options.length > 100)) throw new Error('single.options は1〜100個');
+          if (t === 'multiple' && (!Array.isArray(next.q2.multiple?.options) || next.q2.multiple.options.length === 0 || next.q2.multiple.options.length > 100)) throw new Error('multiple.options は1〜100個');
+          if (t === 'matrix') {
+            const rows = next.q2.matrix?.rows || [];
+            const cols = next.q2.matrix?.cols || [];
+            if (!Array.isArray(rows) || !Array.isArray(cols) || rows.length === 0 || cols.length === 0) throw new Error('matrix.rows/cols は配列で1個以上');
+            if (rows.length > 10 || cols.length > 10) throw new Error('matrix は縦横最大10個');
+          }
+          currentConfig = next;
+          localStorage.setItem('surveyConfigV1', JSON.stringify(next));
+          applyConfig(currentConfig);
+          alert('保存しました');
+        } catch (e) {
+          alert('保存に失敗しました: ' + e.message);
+        }
+      });
+
+      resetConfigBtn.addEventListener('click', () => {
+        if (!confirm('既定設定に戻しますか？')) return;
+        currentConfig = JSON.parse(JSON.stringify(defaultConfig));
+        localStorage.removeItem('surveyConfigV1');
+        applyConfig(currentConfig);
+        refreshEditor(currentConfig);
+        alert('既定に戻しました');
+      });
+
+      // Q2のUIを現在の設定で描画
+      function renderQ2() {
+        const t = (currentConfig.q2?.type) || 'likert';
+        q2Body.innerHTML = '';
+        // それぞれの要素に name="q2" を付与（形式ごとの取得を簡単に）
+        if (t === 'likert') {
+          const points = Math.max(2, Math.min(10, Number(currentConfig.q2.likert?.points ?? 5)));
+          const minLabel = escapeHtml(currentConfig.q2.likert?.minLabel || '低い');
+          const maxLabel = escapeHtml(currentConfig.q2.likert?.maxLabel || '高い');
+          const wrap = document.createElement('div');
+          const scale = document.createElement('div');
+          scale.className = 'rating';
+          for (let i = 1; i <= points; i++) {
+            const id = `likert_${i}`;
+            const input = document.createElement('input');
+            input.type = 'radio';
+            input.name = 'q2';
+            input.value = String(i);
+            if (i === 1) input.required = true; // グループ必須
+            const label = document.createElement('label');
+            label.htmlFor = id;
+            label.textContent = String(i);
+            input.id = id;
+            scale.appendChild(input);
+            scale.appendChild(label);
+          }
+          const help = document.createElement('div');
+          help.style.marginTop = '6px';
+          help.innerHTML = `<small>${minLabel} ← 1 〜 ${points} → ${maxLabel}</small>`;
+          wrap.appendChild(scale);
+          wrap.appendChild(help);
+          q2Body.appendChild(wrap);
+        } else if (t === 'single') {
+          const opts = currentConfig.q2.single?.options || [];
+          const grid = document.createElement('div');
+          grid.className = 'choices';
+          opts.forEach((o, idx) => {
+            const safe = escapeHtml(String(o));
+            const id = `single_${idx}`;
+            const label = document.createElement('label');
+            const input = document.createElement('input');
+            input.type = 'radio';
+            input.name = 'q2';
+            input.value = safe;
+            if (idx === 0) input.required = true;
+            input.id = id;
+            label.htmlFor = id;
+            label.appendChild(input);
+            label.insertAdjacentText('beforeend', ' ' + safe);
+            grid.appendChild(label);
+          });
+          q2Body.appendChild(grid);
+        } else if (t === 'multiple') {
+          const opts = currentConfig.q2.multiple?.options || [];
+          const grid = document.createElement('div');
+          grid.className = 'choices';
+          opts.forEach((o, idx) => {
+            const safe = escapeHtml(String(o));
+            const id = `multi_${idx}`;
+            const label = document.createElement('label');
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.name = 'q2_multi';
+            input.value = safe;
+            input.id = id;
+            label.htmlFor = id;
+            label.appendChild(input);
+            label.insertAdjacentText('beforeend', ' ' + safe);
+            grid.appendChild(label);
+          });
+          q2Body.appendChild(grid);
+        } else if (t === 'matrix') {
+          const rows = currentConfig.q2.matrix?.rows || [];
+          const cols = currentConfig.q2.matrix?.cols || [];
+          const table = document.createElement('table');
+          table.className = 'matrix';
+          const thead = document.createElement('thead');
+          const trh = document.createElement('tr');
+          trh.appendChild(document.createElement('th')); // corner
+          cols.forEach(c => {
+            const th = document.createElement('th'); th.textContent = String(c); trh.appendChild(th);
+          });
+          thead.appendChild(trh);
+          table.appendChild(thead);
+          const tbody = document.createElement('tbody');
+          rows.forEach((r, ri) => {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th'); th.textContent = String(r); tr.appendChild(th);
+            cols.forEach((c, ci) => {
+              const td = document.createElement('td');
+              const id = `mx_${ri}_${ci}`;
+              const input = document.createElement('input');
+              input.type = 'radio';
+              input.name = `q2_row_${ri}`; // 行ごとに1つ選択
+              input.value = String(c);
+              if (ci === 0) input.required = true; // 各行必須
+              input.id = id;
+              td.appendChild(input);
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          q2Body.appendChild(table);
+        } else if (t === 'short') {
+          const cfg = currentConfig.q2.short || {};
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.name = 'q2';
+          input.required = true;
+          if (cfg.placeholder) input.placeholder = cfg.placeholder;
+          if (cfg.maxlength) input.maxLength = Number(cfg.maxlength);
+          if (cfg.preset === 'numeric') { input.inputMode = 'numeric'; }
+          q2Body.appendChild(input);
+        } else if (t === 'long') {
+          const cfg = currentConfig.q2.long || {};
+          const ta = document.createElement('textarea');
+          ta.name = 'q2';
+          ta.required = true;
+          ta.rows = Number(cfg.rows || 5);
+          if (cfg.placeholder) ta.placeholder = cfg.placeholder;
+          if (cfg.maxlength) ta.maxLength = Number(cfg.maxlength);
+          q2Body.appendChild(ta);
+        }
+      }
+
+      // 3) Q1が変わったらQ2の文言/ヒント/UIを更新
       function updateQ2ByQ1() {
         const selected = document.querySelector('input[name="discover"]:checked');
         const key = selected ? selected.value : 'default';
-        q2TitleText.textContent = q2TextMap[key] || q2TextMap.default;
-        q2Group.setAttribute('aria-label', q2TitleText.textContent);
-        q2Hint.textContent = '★の数で評価してください';
-        // Q1が変わったらQ2は選び直しにする
-        q2Radios.forEach(r => r.checked = false);
+        const map = currentConfig.q2?.titleMap || {};
+        const title = map[key] || map.default || defaultConfig.q2.titleMap.default;
+        q2TitleText.textContent = title;
+        q2Hint.textContent = currentConfig.q2?.hint || defaultConfig.q2.hint;
+        renderQ2();
       }
 
-      q1Radios.forEach(r => r.addEventListener('change', updateQ2ByQ1));
-      updateQ2ByQ1(); // 初期反映
+      // 設定を適用（初期）
+      applyConfig(currentConfig);
 
       // 4) 送信ボタン（最小限）。バリデーションはブラウザに任せる。
       form.addEventListener('submit', (e) => {
@@ -102,12 +334,68 @@
           return;
         }
         const discover = document.querySelector('input[name="discover"]:checked')?.value;
-        const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value;
-        alert(`送信ありがとうございました\nQ1: ${discover}\nQ2: ${satisfaction} / 5`);
+        const t = (currentConfig.q2?.type) || 'likert';
+        let q2Value = null;
+
+        // 形式ごとの値取得と追加バリデーション
+        if (t === 'likert' || t === 'single') {
+          q2Value = document.querySelector('input[name="q2"]:checked')?.value;
+        } else if (t === 'multiple') {
+          q2Value = Array.from(document.querySelectorAll('input[name="q2_multi"]:checked')).map(el => el.value);
+          if (q2Value.length === 0) {
+            alert('少なくとも1つ選んでください');
+            return;
+          }
+        } else if (t === 'matrix') {
+          const rows = currentConfig.q2.matrix?.rows || [];
+          const ans = {};
+          for (let ri = 0; ri < rows.length; ri++) {
+            const v = document.querySelector(`input[name="q2_row_${ri}"]:checked`)?.value;
+            if (!v) { alert('各行から1つずつ選択してください'); return; }
+            ans[String(rows[ri])] = v;
+          }
+          q2Value = ans;
+        } else if (t === 'short') {
+          const cfg = currentConfig.q2.short || {};
+          const v = (document.querySelector('input[name="q2"]')?.value || '').trim();
+          if (!validateByPresetAndPattern(v, cfg.preset, cfg.pattern)) { return; }
+          q2Value = v;
+        } else if (t === 'long') {
+          const cfg = currentConfig.q2.long || {};
+          const v = (document.querySelector('textarea[name="q2"]')?.value || '').trim();
+          if (!validateByPresetAndPattern(v, cfg.preset, cfg.pattern)) { return; }
+          q2Value = v;
+        }
+
+        alert(`送信ありがとうございました\nQ1: ${discover}\nQ2: ${formatValue(q2Value)}`);
         form.reset();
         updateQ2ByQ1();
       });
+
+      // プリセットと正規表現の簡易バリデーション
+      function validateByPresetAndPattern(value, preset, pattern) {
+        let re = null;
+        if (pattern) {
+          try { re = new RegExp(pattern); } catch { alert('不正な正規表現です'); return false; }
+        } else if (preset) {
+          if (preset === 'numeric') re = /^\d+$/;
+          else if (preset === 'alpha') re = /^[A-Za-z]+$/;
+          else if (preset === 'alnum') re = /^[A-Za-z0-9]+$/;
+          else if (preset === 'email') re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        }
+        if (re && !re.test(value)) {
+          alert('入力形式が正しくありません');
+          return false;
+        }
+        return true;
+      }
+
+      function formatValue(v) {
+        if (v == null) return '';
+        if (Array.isArray(v)) return v.join(', ');
+        if (typeof v === 'object') return Object.entries(v).map(([k,val]) => `${k}: ${val}`).join(' / ');
+        return String(v);
+      }
     </script>
   </body>
 </html>
-
