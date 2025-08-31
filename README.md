@@ -25,9 +25,12 @@ Q1の回答に応じてQ2の質問文が変わる、最小構成のサンプル�
 
 ## 管理者画面（複数アンケート + 収集案件）
 - 開く: `admin.html`
-- アンケート管理: 一覧/名称編集/新規/複製/削除/インポート/エクスポート、GUI/JSON編集で設定変更
-- 収集案件管理: 作成/複製/削除/保存、状態（draft/active/closed）、期間（開始/終了）、対象アンケート紐付け、回答のJSON/CSV書き出し、全削除
-- 回答リンク生成: 案件の「リンクコピー」で`index.html?project=<案件ID>`をコピー
+- アンケート管理: `admin-surveys.html`（一覧/新規/複製/削除/インポート/エクスポート/アクティブ切替）
+- アンケート編集: `admin-survey-edit.html?id=<アンケートID>`（Q1選択肢、Q2のタイプ別設定、タイトルマップ/ヒント）
+- 回答依頼案件管理: `admin-projects.html`（作成/編集/公開・停止/期間設定/対象アンケート紐付け）
+- 回答データ管理: `admin-data.html`（案件IDまたはアンケートIDで検索し、JSON/CSVエクスポートや全削除）
+- ユーザー管理（ダミー）: `admin-users.html`
+- 回答リンク: `index.html?project=<案件ID>` を共有
 - ストレージキー
   - アンケート一覧: `surveyIndexV1`
   - アクティブID: `activeSurveyIdV1`
@@ -35,6 +38,16 @@ Q1の回答に応じてQ2の質問文が変わる、最小構成のサンプル�
   - 回答（案件）: `surveySubmissionsV1:project:<id>`
   - 回答（案件なし）: `surveySubmissionsV1:survey:<id>`
   - 案件一覧: `surveyProjectsV1`
+
+## 画面構成（フロー）
+- トップ: `top.html`（ログイン種別選択）
+- 判断: 管理者か？ → YES: 管理者画面（`admin.html`） / NO: ユーザー画面（`user.html`）
+- 管理者画面から:
+  - アンケート帳票管理 → 一覧（`admin-surveys.html`）→ 新規/編集（`admin-survey-edit.html`）
+  - 回答依頼案件管理 → 案件の作成/公開（`admin-projects.html`）
+  - 回答データ管理 → 集計/エクスポート（`admin-data.html`）
+  - ユーザー管理（ダミー）
+- ユーザー画面: 公開中の案件一覧から「回答する」→ `index.html?project=<案件ID>` で回答画面へ
   
 ### JSON例（形式切替）
   - Likert（段階数変更）
