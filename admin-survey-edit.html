@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>アンケート編集</title>
+    <style>
+      :root { --accent: #4f8cff; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif; margin: 24px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 22px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+      .row { margin: 10px 0; }
+      input[type=text], textarea, select { width: 100%; max-width: 720px; padding: 8px 10px; border: 1px solid #cfe0ff; border-radius: 8px; }
+      .grid { display: grid; gap: 10px; max-width: 920px; }
+      .card { border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px; }
+      .muted { color: #666; }
+      button, a.btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--accent); background:#fff; color:#333; text-decoration: none; cursor: pointer; }
+      .primary { background: var(--accent); color: #fff; border: none; }
+      .two { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .inline { display:flex; gap:6px; align-items:center; }
+      small { color:#666; }
+      label b { display:block; margin-bottom:4px; }
+    </style>
+  </head>
+  <body>
+    <h1>アンケート編集</h1>
+    <div class="muted" id="meta"></div>
+    <p><a class="btn" href="admin-surveys.html">一覧へ戻る</a> <a class="btn" id="preview" target="_blank">プレビュー</a></p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Q1: 選択肢</h3>
+        <div class="row"><small>改行区切りで入力</small></div>
+        <textarea id="q1opts" rows="6"></textarea>
+      </div>
+      <div class="card">
+        <h3>Q2: 設定</h3>
+        <div class="row">
+          <label><b>タイプ</b>
+            <select id="q2type">
+              <option value="likert">リッカート(1〜N)</option>
+              <option value="single">単一選択</option>
+              <option value="multiple">複数選択</option>
+              <option value="matrix">行列</option>
+              <option value="short">短文入力</option>
+              <option value="long">長文入力</option>
+            </select>
+          </label>
+        </div>
+        <div class="row"><label><b>質問タイトルマップ(JSON)</b>
+          <textarea id="titleMap" rows="6"></textarea></label></div>
+        <div class="row"><label><b>ヒント</b>
+          <input id="q2hint" type="text" /></label></div>
+        <div id="typePanels" class="grid"></div>
+      </div>
+      <div>
+        <button class="primary" id="save">保存</button>
+      </div>
+    </div>
+
+    <template id="panel-likert">
+      <div class="card">
+        <h4>リッカート</h4>
+        <div class="two">
+          <label><b>ポイント数</b><input id="likertPoints" type="number" min="2" max="10" value="5" /></label>
+          <label><b>最小ラベル</b><input id="likertMin" type="text" value="低い" /></label>
+          <label><b>最大ラベル</b><input id="likertMax" type="text" value="高い" /></label>
+        </div>
+      </div>
+    </template>
+    <template id="panel-single">
+      <div class="card">
+        <h4>単一選択</h4>
+        <label><b>選択肢(改行区切り)</b><textarea id="singleOpts" rows="5"></textarea></label>
+      </div>
+    </template>
+    <template id="panel-multiple">
+      <div class="card">
+        <h4>複数選択</h4>
+        <label><b>選択肢(改行区切り)</b><textarea id="multiOpts" rows="5"></textarea></label>
+      </div>
+    </template>
+    <template id="panel-matrix">
+      <div class="card">
+        <h4>行列</h4>
+        <div class="row"><label class="inline"><b>選択モード</b>
+          <select id="matrixMode"><option value="single">単一</option><option value="multi">複数</option></select></label></div>
+        <label><b>行(改行区切り)</b><textarea id="matrixRows" rows="4"></textarea></label>
+        <label><b>列(改行区切り)</b><textarea id="matrixCols" rows="4"></textarea></label>
+      </div>
+    </template>
+    <template id="panel-short">
+      <div class="card">
+        <h4>短文入力</h4>
+        <div class="two">
+          <label><b>プレースホルダー</b><input id="shortPH" type="text" /></label>
+          <label><b>最大文字数</b><input id="shortMax" type="number" min="1" /></label>
+          <label><b>プリセット</b>
+            <select id="shortPreset"><option value="">なし</option><option value="numeric">数値</option><option value="alpha">英字</option><option value="alnum">英数字</option><option value="email">メール</option></select>
+          </label>
+          <label><b>正規表現</b><input id="shortPattern" type="text" placeholder="/…/ ではなく生のパターン" /></label>
+        </div>
+      </div>
+    </template>
+    <template id="panel-long">
+      <div class="card">
+        <h4>長文入力</h4>
+        <div class="two">
+          <label><b>プレースホルダー</b><input id="longPH" type="text" /></label>
+          <label><b>最大文字数</b><input id="longMax" type="number" min="1" /></label>
+          <label><b>行数</b><input id="longRows" type="number" min="1" value="5" /></label>
+          <label><b>プリセット</b>
+            <select id="longPreset"><option value="">なし</option><option value="numeric">数値</option><option value="alpha">英字</option><option value="alnum">英数字</option><option value="email">メール</option></select>
+          </label>
+          <label><b>正規表現</b><input id="longPattern" type="text" /></label>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      const INDEX_KEY='surveyIndexV1';
+      const CONFIG_KEY=id=>`surveyConfigV1:${id}`;
+
+      function parseQS(){ return Object.fromEntries(new URLSearchParams(location.search).entries()); }
+      function loadIndex(){ try{ return JSON.parse(localStorage.getItem(INDEX_KEY)||'[]'); }catch{return []} }
+      function findMeta(id){ return loadIndex().find(s=>s.id===id); }
+      function loadCfg(id){ try{ return JSON.parse(localStorage.getItem(CONFIG_KEY(id))||'{}'); }catch{return {};} }
+      function saveCfg(id,cfg){ localStorage.setItem(CONFIG_KEY(id), JSON.stringify(cfg)); }
+
+      const id = parseQS().id;
+      const meta = findMeta(id);
+      const cfg = loadCfg(id);
+      document.getElementById('meta').textContent = `ID: ${id} / 名称: ${meta?.name || '(不明)'}`;
+      document.getElementById('preview').href = 'index.html';
+
+      // Q1
+      const q1 = (cfg.options && Array.isArray(cfg.options)) ? cfg.options : ['SNS','検索','友人・同僚','イベント','その他'];
+      document.getElementById('q1opts').value = q1.join('\n');
+
+      // Q2 common
+      const q2 = cfg.q2 || { type:'likert', titleMap:{ default:'満足度を教えてください' }, hint:'1〜5で評価してください' };
+      document.getElementById('q2type').value = q2.type || 'likert';
+      document.getElementById('titleMap').value = JSON.stringify(q2.titleMap || { default:'満足度を教えてください' }, null, 2);
+      document.getElementById('q2hint').value = q2.hint || '';
+
+      // type specific panels
+      const panels = {
+        likert: document.getElementById('panel-likert'),
+        single: document.getElementById('panel-single'),
+        multiple: document.getElementById('panel-multiple'),
+        matrix: document.getElementById('panel-matrix'),
+        short: document.getElementById('panel-short'),
+        long: document.getElementById('panel-long'),
+      };
+      const container = document.getElementById('typePanels');
+
+      function renderTypePanel(){
+        container.innerHTML='';
+        const t = document.getElementById('q2type').value;
+        const node = panels[t].content.cloneNode(true);
+        container.appendChild(node);
+        // fill values
+        if (t==='likert'){
+          document.getElementById('likertPoints').value = q2.likert?.points ?? 5;
+          document.getElementById('likertMin').value = q2.likert?.minLabel ?? '低い';
+          document.getElementById('likertMax').value = q2.likert?.maxLabel ?? '高い';
+        } else if (t==='single'){
+          document.getElementById('singleOpts').value = (q2.single?.options || ['はい','いいえ']).join('\n');
+        } else if (t==='multiple'){
+          document.getElementById('multiOpts').value = (q2.multiple?.options || ['A','B','C']).join('\n');
+        } else if (t==='matrix'){
+          document.getElementById('matrixMode').value = q2.matrix?.selectMode || 'single';
+          document.getElementById('matrixRows').value = (q2.matrix?.rows || ['使いやすさ','デザイン']).join('\n');
+          document.getElementById('matrixCols').value = (q2.matrix?.cols || ['不満','普通','満足']).join('\n');
+        } else if (t==='short'){
+          document.getElementById('shortPH').value = q2.short?.placeholder || '';
+          document.getElementById('shortMax').value = q2.short?.maxlength || '';
+          document.getElementById('shortPreset').value = q2.short?.preset || '';
+          document.getElementById('shortPattern').value = q2.short?.pattern || '';
+        } else if (t==='long'){
+          document.getElementById('longPH').value = q2.long?.placeholder || '';
+          document.getElementById('longMax').value = q2.long?.maxlength || '';
+          document.getElementById('longRows').value = q2.long?.rows || 5;
+          document.getElementById('longPreset').value = q2.long?.preset || '';
+          document.getElementById('longPattern').value = q2.long?.pattern || '';
+        }
+      }
+      document.getElementById('q2type').addEventListener('change', renderTypePanel);
+      renderTypePanel();
+
+      // 保存
+      document.getElementById('save').addEventListener('click', ()=>{
+        // Q1
+        const q1opts = document.getElementById('q1opts').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        // Q2 common
+        const type = document.getElementById('q2type').value;
+        let titleMap = {};
+        try { titleMap = JSON.parse(document.getElementById('titleMap').value || '{}'); }
+        catch { alert('タイトルマップのJSONが不正です'); return; }
+        const hint = document.getElementById('q2hint').value;
+        const q2out = { type, titleMap, hint };
+        // type specific
+        if (type==='likert'){
+          q2out.likert = { points: Number(document.getElementById('likertPoints').value||5), minLabel: document.getElementById('likertMin').value||'低い', maxLabel: document.getElementById('likertMax').value||'高い' };
+        } else if (type==='single'){
+          q2out.single = { options: document.getElementById('singleOpts').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean) };
+        } else if (type==='multiple'){
+          q2out.multiple = { options: document.getElementById('multiOpts').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean) };
+        } else if (type==='matrix'){
+          q2out.matrix = { selectMode: document.getElementById('matrixMode').value, rows: document.getElementById('matrixRows').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean), cols: document.getElementById('matrixCols').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean) };
+        } else if (type==='short'){
+          q2out.short = { placeholder: document.getElementById('shortPH').value, maxlength: Number(document.getElementById('shortMax').value||0)||undefined, preset: document.getElementById('shortPreset').value, pattern: document.getElementById('shortPattern').value };
+        } else if (type==='long'){
+          q2out.long = { placeholder: document.getElementById('longPH').value, maxlength: Number(document.getElementById('longMax').value||0)||undefined, rows: Number(document.getElementById('longRows').value||5), preset: document.getElementById('longPreset').value, pattern: document.getElementById('longPattern').value };
+        }
+
+        const out = { options: q1opts, q2: q2out };
+        saveCfg(id, out);
+        alert('保存しました');
+      });
+    </script>
+  </body>
+</html>
+

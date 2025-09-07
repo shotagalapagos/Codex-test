@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>回答データ 管理</title>
+    <style>
+      :root { --accent: #4f8cff; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif; margin: 24px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 22px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+      .grid { display: grid; gap: 10px; max-width: 1100px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #e5e5e5; padding: 6px 8px; font-size: 13px; }
+      th { background: #f7fbff; }
+      .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      select, input[type=text] { padding: 6px 8px; border: 1px solid #cfe0ff; border-radius: 8px; }
+      button, a.btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--accent); background:#fff; color:#333; cursor: pointer; text-decoration: none; }
+      .primary { background: var(--accent); color: #fff; border: none; }
+      .muted { color:#666; }
+      pre { max-height: 300px; overflow:auto; background:#fafafa; padding:8px; border:1px solid #eee; }
+    </style>
+  </head>
+  <body>
+    <h1>回答データ 管理</h1>
+    <div class="controls">
+      <label>対象
+        <select id="target">
+          <option value="survey">アンケートID指定</option>
+          <option value="project">案件ID指定</option>
+        </select>
+      </label>
+      <input id="id" type="text" placeholder="IDを入力" />
+      <button id="load" class="primary">読み込み</button>
+      <button id="exportCsv">CSV出力</button>
+      <button id="exportJson">JSON出力</button>
+      <button id="clear">全削除</button>
+      <a class="btn" href="admin.html">管理ハブへ戻る</a>
+    </div>
+    <div class="muted" style="margin-top:6px;">ヒント: ユーザー画面や案件画面で表示されるIDを入力してください。</div>
+    <div id="summary" style="margin:10px 0;">0 件</div>
+    <div class="grid">
+      <table id="tbl"><thead><tr><th>#</th><th>日時</th><th>案件ID</th><th>アンケートID</th><th>Q1</th><th>Q2タイプ</th><th>Q2値</th></tr></thead><tbody></tbody></table>
+      <details>
+        <summary>RAW JSON</summary>
+        <pre id="raw"></pre>
+      </details>
+    </div>
+
+    <script>
+      const SUB_SURVEY_KEY=id=>`surveySubmissionsV1:survey:${id}`;
+      const SUB_PROJECT_KEY=id=>`surveySubmissionsV1:project:${id}`;
+      const tbody=document.querySelector('#tbl tbody');
+      const rawEl=document.getElementById('raw');
+      const summary=document.getElementById('summary');
+
+      function load(target, id){
+        const key = target==='project' ? SUB_PROJECT_KEY(id) : SUB_SURVEY_KEY(id);
+        try{ return JSON.parse(localStorage.getItem(key)||'[]'); }catch{return []}
+      }
+      function save(target, id, arr){
+        const key = target==='project' ? SUB_PROJECT_KEY(id) : SUB_SURVEY_KEY(id);
+        localStorage.setItem(key, JSON.stringify(arr));
+      }
+      function render(arr){
+        tbody.innerHTML='';
+        arr.forEach((r,i)=>{
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>${i+1}</td><td>${r.ts||''}</td><td>${r.projectId||''}</td><td>${r.surveyId||''}</td><td>${escape(r.q1||'')}</td><td>${r.q2Type||''}</td><td>${escape(fmt(r.q2Value))}</td>`;
+          tbody.appendChild(tr);
+        });
+        rawEl.textContent = JSON.stringify(arr, null, 2);
+        summary.textContent = `${arr.length} 件`;
+      }
+      function fmt(v){ if(v==null) return ''; if(Array.isArray(v)) return v.join(','); if(typeof v==='object') return JSON.stringify(v); return String(v); }
+      function escape(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+      document.getElementById('load').addEventListener('click', ()=>{
+        const target=document.getElementById('target').value; const id=document.getElementById('id').value.trim(); if(!id){ alert('IDを入力してください'); return; }
+        render(load(target,id));
+      });
+      document.getElementById('exportCsv').addEventListener('click', ()=>{
+        const target=document.getElementById('target').value; const id=document.getElementById('id').value.trim(); if(!id) return;
+        const arr=load(target,id);
+        const head=['ts','projectId','surveyId','q1','q2Type','q2Value'];
+        const csv=[head.join(',')].concat(arr.map(r=>head.map(k=>JSON.stringify(k==='q2Value'?fmt(r[k]):(r[k]??'')).replace(/^"|"$/g,'')).map(v=>`"${v.replaceAll('"','""')}"`).join(','))).join('\n');
+        const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`answers-${target}-${id}.csv`; a.click(); URL.revokeObjectURL(a.href);
+      });
+      document.getElementById('exportJson').addEventListener('click', ()=>{
+        const target=document.getElementById('target').value; const id=document.getElementById('id').value.trim(); if(!id) return;
+        const arr=load(target,id); const blob=new Blob([JSON.stringify(arr,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`answers-${target}-${id}.json`; a.click(); URL.revokeObjectURL(a.href);
+      });
+      document.getElementById('clear').addEventListener('click', ()=>{
+        const target=document.getElementById('target').value; const id=document.getElementById('id').value.trim(); if(!id) return;
+        if(!confirm('全削除しますか？')) return; save(target,id,[]); render([]);
+      });
+    </script>
+  </body>
+</html>
+

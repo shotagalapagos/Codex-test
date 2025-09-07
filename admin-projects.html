@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>回答依頼案件 管理</title>
+    <style>
+      :root { --accent: #4f8cff; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif; margin: 24px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 22px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+      .grid { display: grid; gap: 10px; max-width: 1000px; }
+      .row { border: 1px solid #e5e5e5; border-radius: 10px; padding: 10px; display:grid; grid-template-columns: 1fr auto; align-items:center; }
+      .muted { color:#666; }
+      button, a.btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--accent); background:#fff; cursor:pointer; color:#333; text-decoration:none; }
+      .primary{ background: var(--accent); color: #fff; border: none; }
+      .inline{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      input[type=text], select, input[type=date]{ padding:6px 8px; border:1px solid #cfe0ff; border-radius:8px; }
+    </style>
+  </head>
+  <body>
+    <h1>回答依頼案件 管理</h1>
+    <div class="inline" style="margin-bottom:10px;">
+      <button id="new" class="primary">新規作成</button>
+      <a class="btn" href="admin.html">管理ハブへ戻る</a>
+    </div>
+    <div id="list" class="grid"></div>
+
+    <template id="rowT">
+      <div class="row">
+        <div>
+          <div><b class="name"></b> <span class="muted">(<span class="id"></span>)</span></div>
+          <div class="muted">対象アンケート: <span class="survey"></span> / 状態: <span class="status"></span> / 期間: <span class="period"></span></div>
+          <div>回答リンク: <a class="link" target="_blank"></a></div>
+        </div>
+        <div class="inline">
+          <button class="edit">編集</button>
+          <button class="toggle"></button>
+          <button class="del">削除</button>
+        </div>
+      </div>
+    </template>
+
+    <dialog id="dlg">
+      <form method="dialog">
+        <h3>案件編集</h3>
+        <div class="grid">
+          <label>名称<input id="fName" type="text" required></label>
+          <label>対象アンケート<select id="fSurvey"></select></label>
+          <label>開始日<input id="fStart" type="date"></label>
+          <label>終了日<input id="fEnd" type="date"></label>
+          <label>状態<select id="fStatus"><option value="draft">下書き</option><option value="active">公開中</option><option value="closed">終了</option></select></label>
+        </div>
+        <div class="inline" style="margin-top:10px;">
+          <button value="cancel">キャンセル</button>
+          <button id="save" class="primary" value="ok">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      const INDEX_KEY='surveyIndexV1';
+      const PROJECTS_KEY='surveyProjectsV1';
+      const genId=()=> 'p'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);
+      function loadIndex(){ try{ return JSON.parse(localStorage.getItem(INDEX_KEY)||'[]'); }catch{return []} }
+      function loadProjects(){ try{ return JSON.parse(localStorage.getItem(PROJECTS_KEY)||'[]'); }catch{return []} }
+      function saveProjects(v){ localStorage.setItem(PROJECTS_KEY, JSON.stringify(v)); }
+
+      const list=document.getElementById('list');
+      const rowT=document.getElementById('rowT');
+
+      function render(){
+        const idx=loadIndex(); const ps=loadProjects(); list.innerHTML='';
+        if(!ps.length){ list.innerHTML='<div class="muted">案件がありません。新規作成してください。</div>'; return; }
+        ps.forEach(p=>{
+          const node=rowT.content.cloneNode(true);
+          node.querySelector('.name').textContent=p.name;
+          node.querySelector('.id').textContent=p.id;
+          const met=idx.find(s=>s.id===p.surveyId);
+          node.querySelector('.survey').textContent=met?`${met.name} (${met.id})`:'(不明)';
+          node.querySelector('.status').textContent=p.status||'draft';
+          node.querySelector('.period').textContent=`${p.start||'-'} 〜 ${p.end||'-'}`;
+          const a=node.querySelector('.link'); a.href=`index.html?project=${encodeURIComponent(p.id)}`; a.textContent=a.href;
+          const toggle=node.querySelector('.toggle'); toggle.textContent=p.status==='active'?'停止':'公開';
+          toggle.addEventListener('click',()=>{ p.status = (p.status==='active'?'draft':'active'); saveProjects(ps); render(); });
+          node.querySelector('.del').addEventListener('click',()=>{ if(!confirm('削除しますか？')) return; const z=loadProjects().filter(x=>x.id!==p.id); saveProjects(z); render(); });
+          node.querySelector('.edit').addEventListener('click',()=> openEdit(p));
+          list.appendChild(node);
+        });
+      }
+
+      document.getElementById('new').addEventListener('click',()=> openEdit({ id:genId(), name:'新規案件', surveyId: loadIndex()[0]?.id, status:'draft' }));
+
+      const dlg=document.getElementById('dlg');
+      function openEdit(p){
+        const idx=loadIndex();
+        document.getElementById('fName').value=p.name||'';
+        const sel=document.getElementById('fSurvey'); sel.innerHTML='';
+        idx.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.name} (${m.id})`; sel.appendChild(o); });
+        sel.value=p.surveyId||idx[0]?.id||'';
+        document.getElementById('fStart').value=p.start||'';
+        document.getElementById('fEnd').value=p.end||'';
+        document.getElementById('fStatus').value=p.status||'draft';
+        dlg.returnValue=''; dlg.showModal();
+        dlg.addEventListener('close', onClose);
+        function onClose(){ dlg.removeEventListener('close', onClose); if(dlg.returnValue!=='ok') return; save(); }
+        function save(){
+          const ps=loadProjects();
+          const exist=ps.find(x=>x.id===p.id);
+          const obj={ id:p.id, name:document.getElementById('fName').value||'案件', surveyId: sel.value, start: document.getElementById('fStart').value||'', end: document.getElementById('fEnd').value||'', status: document.getElementById('fStatus').value };
+          if(exist){ Object.assign(exist, obj); } else { ps.push(obj); }
+          saveProjects(ps); render();
+        }
+      }
+
+      render();
+    </script>
+  </body>
+</html>
+

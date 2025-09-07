@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>アンケート帳票管理</title>
+    <style>
+      :root { --accent: #4f8cff; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif; margin: 24px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 22px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+      .grid { display: grid; gap: 10px; max-width: 960px; }
+      .row { border: 1px solid #e5e5e5; border-radius: 10px; padding: 10px; display: grid; grid-template-columns: 1fr auto; align-items: center; }
+      .actions { display: inline-flex; gap: 6px; }
+      button, a.btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--accent); background: #fff; cursor: pointer; color: #333; text-decoration: none; }
+      .primary { background: var(--accent); color: #fff; border: none; }
+      .muted { color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>アンケート帳票管理</h1>
+    <div style="margin-bottom:10px; display:flex; gap:8px; align-items:center;">
+      <button id="new" class="primary">新規作成</button>
+      <button id="import">インポート(JSON)</button>
+      <a class="btn" href="admin.html">管理ハブへ戻る</a>
+    </div>
+    <div id="list" class="grid"></div>
+
+    <template id="rowT">
+      <div class="row">
+        <div>
+          <div><b class="name"></b> <span class="muted">(<span class="id"></span>)</span></div>
+          <div class="muted">アクティブ: <span class="active"></span></div>
+        </div>
+        <div class="actions">
+          <a class="btn edit" href="#">編集</a>
+          <button class="dup">複製</button>
+          <button class="setActive">アクティブにする</button>
+          <button class="export">エクスポート</button>
+          <button class="del">削除</button>
+          <a class="btn prev" target="_blank">プレビュー</a>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      const INDEX_KEY = 'surveyIndexV1';
+      const ACTIVE_KEY = 'activeSurveyIdV1';
+      const CONFIG_KEY = id => `surveyConfigV1:${id}`;
+
+      function loadIndex(){ try{ return JSON.parse(localStorage.getItem(INDEX_KEY)||'[]'); }catch{return []} }
+      function saveIndex(v){ localStorage.setItem(INDEX_KEY, JSON.stringify(v)); }
+      function genId(){ return 's'+Math.random().toString(36).slice(2,8)+Date.now().toString(36); }
+
+      // default config fallback
+      function defaultConfig(){
+        return {
+          options: ['SNS','検索','友人・同僚','イベント','その他'],
+          q2: {
+            type: 'likert',
+            titleMap: { SNS:'SNSで見た情報は役に立ちましたか？', 検索:'検索結果の内容は分かりやすかったですか？', '友人・同僚':'紹介への満足度を教えてください', イベント:'イベントの内容に満足しましたか？', その他:'全体的な満足度を教えてください', default:'満足度を教えてください' },
+            hint: '1〜5で評価してください',
+            likert: { points: 5, minLabel:'低い', maxLabel:'高い' },
+          }
+        };
+      }
+
+      const listEl = document.getElementById('list');
+      const rowT = document.getElementById('rowT');
+
+      function render(){
+        const idx = loadIndex();
+        const active = localStorage.getItem(ACTIVE_KEY);
+        listEl.innerHTML='';
+        if (!idx.length) { listEl.innerHTML = '<div class="muted">アンケートがありません。新規作成してください。</div>'; return; }
+        idx.forEach(meta => {
+          const node = rowT.content.cloneNode(true);
+          node.querySelector('.name').textContent = meta.name || '(無題)';
+          node.querySelector('.id').textContent = meta.id;
+          node.querySelector('.active').textContent = (meta.id===active)?'はい':'いいえ';
+          node.querySelector('.edit').href = `admin-survey-edit.html?id=${encodeURIComponent(meta.id)}`;
+          node.querySelector('.prev').href = `index.html`;
+          node.querySelector('.dup').addEventListener('click',()=>{
+            const id2 = genId();
+            const idx2 = [...idx, { id:id2, name: `${meta.name || 'アンケート'} の複製` }];
+            const cfg = localStorage.getItem(CONFIG_KEY(meta.id));
+            if (cfg) localStorage.setItem(CONFIG_KEY(id2), cfg);
+            saveIndex(idx2); render();
+          });
+          node.querySelector('.export').addEventListener('click',()=>{
+            const cfg = localStorage.getItem(CONFIG_KEY(meta.id)) || '{}';
+            const blob = new Blob([cfg], {type:'application/json'});
+            const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`survey-${meta.id}.json`; a.click(); URL.revokeObjectURL(a.href);
+          });
+          node.querySelector('.del').addEventListener('click',()=>{
+            if (!confirm('削除しますか？この操作は元に戻せません。')) return;
+            const idx2 = idx.filter(s=>s.id!==meta.id);
+            saveIndex(idx2);
+            localStorage.removeItem(CONFIG_KEY(meta.id));
+            if (localStorage.getItem(ACTIVE_KEY)===meta.id && idx2[0]) localStorage.setItem(ACTIVE_KEY, idx2[0].id);
+            render();
+          });
+          node.querySelector('.setActive').addEventListener('click',()=>{ localStorage.setItem(ACTIVE_KEY, meta.id); render(); });
+          listEl.appendChild(node);
+        });
+      }
+
+      document.getElementById('new').addEventListener('click',()=>{
+        const name = prompt('アンケート名'); if (!name) return;
+        const id = genId();
+        const idx = loadIndex(); idx.push({ id, name }); saveIndex(idx);
+        localStorage.setItem(CONFIG_KEY(id), JSON.stringify(defaultConfig()));
+        if (!localStorage.getItem(ACTIVE_KEY)) localStorage.setItem(ACTIVE_KEY, id);
+        location.href = `admin-survey-edit.html?id=${encodeURIComponent(id)}`;
+      });
+
+      document.getElementById('import').addEventListener('click', async ()=>{
+        const file = await pickFile(); if (!file) return;
+        const text = await file.text();
+        try {
+          JSON.parse(text);
+          const name = prompt('この設定の表示名'); if (!name) return;
+          const id = genId();
+          const idx = loadIndex(); idx.push({ id, name }); saveIndex(idx);
+          localStorage.setItem(CONFIG_KEY(id), text);
+          alert('インポートしました'); render();
+        } catch { alert('JSONが不正です'); }
+      });
+
+      function pickFile(){ return new Promise(r=>{ const i=document.createElement('input'); i.type='file'; i.accept='.json,application/json'; i.onchange=()=>r(i.files?.[0]||null); i.click(); }); }
+
+      render();
+    </script>
+  </body>
+</html>
+
